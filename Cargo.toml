@@ -1,0 +1,10 @@
+[package]
+name = "http-ip2asn"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive", "env"] }
+flate2 = "1.1"
+tokio = { version = "1.45", features = ["rt", "rt-multi-thread", "macros", "fs", "io-util"] }
+axum = "0.8"
