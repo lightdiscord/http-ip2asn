@@ -40,7 +40,7 @@ struct Cli {
     )]
     database_url: Url,
 
-    /// Database retrieval frequency in seconds
+    /// Database retrieval frequency in seconds (0 to disable)
     #[arg(long, env = "IPTOASN_DATABASE_FREQUENCY", default_value = "3600")]
     database_frequency: u64,
 
@@ -174,7 +174,6 @@ async fn database_synchronization_once(
 
 async fn database_synchronization(state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error>> {
     loop {
-        //sleep(Duration::from_secs(10)).await;
         debug!("Starting database synchronization");
 
         match database_synchronization_once(&state.options).await {
@@ -182,6 +181,11 @@ async fn database_synchronization(state: Arc<AppState>) -> Result<(), Box<dyn st
                 state.database.store(Some(Arc::new(database)));
 
                 info!("Database has been synchronized");
+
+                // If the frequency is disabled, stops after the first success.
+                if state.options.database_frequency == 0 {
+                    return Ok(());
+                }
 
                 sleep(Duration::from_secs(state.options.database_frequency)).await;
             }
