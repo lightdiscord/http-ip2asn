@@ -41,7 +41,7 @@ struct Cli {
     database_url: Url,
 
     /// Database retrieval frequency in seconds (0 to disable)
-    #[arg(long, env = "IPTOASN_DATABASE_FREQUENCY", default_value = "0")]
+    #[arg(long, env = "IPTOASN_DATABASE_FREQUENCY", default_value = "3600")]
     database_frequency: u64,
 
     /// Host used for the web server
