@@ -57,12 +57,29 @@ struct ASN {
     description: String,
 }
 
+struct Database {
+    inner: BTreeMap<IpAddr, ASN>,
+}
+
+impl Database {
+    fn new(inner: BTreeMap<IpAddr, ASN>) -> Self {
+        Self { inner }
+    }
+
+    pub fn get(&self, address: IpAddr) -> Option<&ASN> {
+        self.inner.upper_bound(Bound::Included(&address))
+            .peek_prev()
+            .map(|(_index, asn)| asn)
+            .filter(|asn| asn.range_start <= address && address <= asn.range_end)
+    }
+}
+
 struct AppState {
-    map: Option<BTreeMap<IpAddr, ASN>>,
+    database: Option<Database>,
 }
 
 // TODO: Change error
-fn load_asns(contents: String) -> Result<BTreeMap<IpAddr, ASN>, Box<dyn std::error::Error>> {
+fn load_asns(contents: String) -> Result<Database, Box<dyn std::error::Error>> {
     let mut map = BTreeMap::new();
 
     for line in contents.lines() {
@@ -85,7 +102,7 @@ fn load_asns(contents: String) -> Result<BTreeMap<IpAddr, ASN>, Box<dyn std::err
         map.insert(range_start, asn);
     }
 
-    Ok(map)
+    Ok(Database::new(map))
 }
 
 #[tokio::main]
@@ -103,7 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let contents = gunzip(contents)?;
 
     let state = AppState {
-        map: Some(load_asns(contents)?),
+        database: Some(load_asns(contents)?),
     };
 
     let state = Arc::new(state);
@@ -125,20 +142,14 @@ async fn root(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> (StatusCode, HeaderMap) {
-    if let Some(map) = state.map.as_ref() {
+    if let Some(database) = state.database.as_ref() {
         let address = headers
             .get("X-Forwarded-For")
             .map(|addr| IpAddr::from_str(addr.to_str().unwrap()))
             .unwrap_or(Ok(address.ip()))
             .unwrap();
 
-        let asn = map.upper_bound(Bound::Included(&address));
-        let asn = asn
-            .peek_prev()
-            .map(|(_index, asn)| asn)
-            .filter(|asn| asn.range_start <= address && address <= asn.range_end);
-
-        if let Some(asn) = asn {
+        if let Some(asn) = database.get(address) {
             let mut headers = HeaderMap::new();
 
             headers.insert("x-asn-number", asn.as_number.to_string().parse().unwrap());
