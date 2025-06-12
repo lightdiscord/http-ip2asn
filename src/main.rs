@@ -41,7 +41,7 @@ struct Cli {
     database_url: Url,
 
     /// Database retrieval frequency in seconds (0 to disable)
-    #[arg(long, env = "IPTOASN_DATABASE_FREQUENCY", default_value = "3600")]
+    #[arg(long, env = "IPTOASN_DATABASE_FREQUENCY", default_value = "0")]
     database_frequency: u64,
 
     /// Host used for the web server
@@ -156,9 +156,15 @@ async fn database_synchronization_once(
 
         contents
     } else {
-        unimplemented!("download from address")
+        reqwest::get(options.database_url.clone())
+            .await?
+            .error_for_status()?
+            .bytes()
+            .await?
+            .to_vec()
     };
 
+    // The database can be huge which can blocks requests on the web server.
     let database = task::spawn_blocking(move || {
         let database = gunzip(database);
 
@@ -193,6 +199,8 @@ async fn database_synchronization(state: Arc<AppState>) -> Result<(), Box<dyn st
                 error!("error while synchronizing database: {}", e);
 
                 // TODO: Exponential back-off.
+
+                sleep(Duration::from_secs(15)).await;
             }
         }
     }
