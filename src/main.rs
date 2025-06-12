@@ -14,12 +14,31 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use log::info;
+use reqwest::Url;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
+    /// Local database file path to use instead of the URL.
     #[arg(long, env = "IPTOASN_DATABASE_FILE")]
-    database_file: PathBuf,
+    database_file: Option<PathBuf>,
+
+    /// Download URL for the database file to be fetched regularly.
+    #[arg(long, env = "IPTOASN_DATABASE_URL", default_value = "https://iptoasn.com/data/ip2asn-combined.tsv.gz")]
+    database_url: Url,
+
+    /// Database retrieval frequency in seconds
+    #[arg(long, env = "IPTOASN_DATABASE_FREQUENCY", default_value = "3600")]
+    database_frequency: usize,
+
+    /// Host used for the web server
+    #[arg(long, env = "HOST", default_value = "0.0.0.0")]
+    host: IpAddr,
+
+    /// Port used for the web server
+    #[arg(long, env = "PORT", default_value = "80")]
+    port: u16,
 }
 
 fn gunzip(bytes: Vec<u8>) -> std::io::Result<String> {
@@ -71,11 +90,15 @@ fn load_asns(contents: String) -> Result<BTreeMap<IpAddr, ASN>, Box<dyn std::err
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
+
     let cli = Cli::parse();
 
-    let mut file = File::open(cli.database_file).await?;
+    let mut file = File::open(cli.database_file.unwrap()).await?;
     let mut contents = vec![];
     file.read_to_end(&mut contents).await?;
+
+    info!("Parsing database file");
 
     let contents = gunzip(contents)?;
 
@@ -90,7 +113,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_state(state)
         .into_make_service_with_connect_info::<SocketAddr>();
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listen_address = SocketAddr::new(cli.host, cli.port);
+    let listener = tokio::net::TcpListener::bind(listen_address).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 
     Ok(())
