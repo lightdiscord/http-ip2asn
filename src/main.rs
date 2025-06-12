@@ -119,7 +119,6 @@ fn gunzip(bytes: Vec<u8>) -> Result<String, DatabaseError> {
     Ok(s)
 }
 
-// TODO: Change error
 fn load_asns(contents: String) -> Result<Database, DatabaseError> {
     let mut map = BTreeMap::new();
 
@@ -227,9 +226,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let cli = Cli::parse();
-
-    // if cli.database_file.is_so
-    //
 
     let state = Arc::new(AppState {
         options: cli,
