@@ -10,8 +10,8 @@ tokio = { version = "1.45", features = ["rt", "rt-multi-thread", "macros", "fs",
 axum = "0.8"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 log = "0.4.27"
-reqwest = "0.12.20"
+reqwest = { version = "0.12.20", features = ["rustls-tls", "charset", "http2", "system-proxy"], default-features = false }
 arc-swap = "1.7.1"
 tracing = "0.1.41"
 thiserror = "2.0.12"
-tower-http = { version = "0.6.2", features = ["trace"] }
+tower-http = { version = "0.6.6", features = ["trace"] }

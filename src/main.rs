@@ -5,8 +5,8 @@ use crate::DatabaseError::{
 };
 use arc_swap::ArcSwapOption;
 use axum::Router;
-use axum::extract::{ConnectInfo, MatchedPath, State};
-use axum::http::{HeaderMap, Request, StatusCode};
+use axum::extract::{ConnectInfo, State};
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::get;
 use clap::Parser;
 use flate2::read::GzDecoder;
@@ -19,16 +19,12 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
-use axum::body::Bytes;
-use axum::response::Response;
 use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::time::sleep;
 use tokio::{task, try_join};
-use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::trace::TraceLayer;
-use tracing::{info_span, Span};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
