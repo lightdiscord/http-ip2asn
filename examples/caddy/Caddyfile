@@ -1,0 +1,19 @@
+:80 {
+    reverse_proxy ip2asn:80 {
+        method GET
+        rewrite /
+
+        @forbidden {
+            header X-Asn-Description "*GOOGLE*"
+            header X-Asn-Description "*Not routed*"
+        }
+
+        handle_response @forbidden {
+            respond "forbidden"
+        }
+
+        handle_response {
+            respond "allowed"
+        }
+    }
+}

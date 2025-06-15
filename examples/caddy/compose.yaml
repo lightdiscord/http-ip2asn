@@ -1,0 +1,13 @@
+services:
+  ip2asn:
+    build:
+      context: ../..
+
+  caddy:
+    image: caddy:2
+
+    ports:
+      - "3000:80"
+
+    volumes:
+      - "./Caddyfile:/etc/caddy/Caddyfile:ro"
