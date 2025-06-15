@@ -5,8 +5,8 @@ use crate::DatabaseError::{
 };
 use arc_swap::ArcSwapOption;
 use axum::Router;
-use axum::extract::{ConnectInfo, State};
-use axum::http::{HeaderMap, StatusCode};
+use axum::extract::{ConnectInfo, MatchedPath, State};
+use axum::http::{HeaderMap, Request, StatusCode};
 use axum::routing::get;
 use clap::Parser;
 use flate2::read::GzDecoder;
@@ -19,11 +19,16 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use axum::body::Bytes;
+use axum::response::Response;
 use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use tokio::time::sleep;
 use tokio::{task, try_join};
+use tower_http::classify::ServerErrorsFailureClass;
+use tower_http::trace::TraceLayer;
+use tracing::{info_span, Span};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -210,6 +215,7 @@ async fn webserver(state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error
     let app = Router::new()
         .route("/", get(root))
         .with_state(state.clone())
+        .layer(TraceLayer::new_for_http())
         .into_make_service_with_connect_info::<SocketAddr>();
 
     let listener = tokio::net::TcpListener::bind(listen_address).await?;
@@ -250,6 +256,8 @@ async fn root(
             .map(|addr| IpAddr::from_str(addr.to_str().unwrap()))
             .unwrap_or(Ok(address.ip()))
             .unwrap();
+
+        debug!("Fetching database for {}", address);
 
         if let Some(asn) = database.get(address) {
             let mut headers = HeaderMap::new();

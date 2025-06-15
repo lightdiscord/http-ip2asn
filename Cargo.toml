@@ -14,3 +14,4 @@ reqwest = "0.12.20"
 arc-swap = "1.7.1"
 tracing = "0.1.41"
 thiserror = "2.0.12"
+tower-http = { version = "0.6.2", features = ["trace"] }
