@@ -22,9 +22,13 @@ use std::time::Duration;
 use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
+use tokio::signal;
 use tokio::time::sleep;
 use tokio::{task, try_join};
 use tower_http::trace::TraceLayer;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -206,6 +210,32 @@ async fn database_synchronization(state: Arc<AppState>) -> Result<(), Box<dyn st
     }
 }
 
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    info!("Received termination signal shutting down");
+}
+
 async fn webserver(state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error>> {
     let listen_address = SocketAddr::new(state.options.host, state.options.port);
     let app = Router::new()
@@ -216,15 +246,24 @@ async fn webserver(state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error
 
     let listener = tokio::net::TcpListener::bind(listen_address).await?;
     info!("Server listening {}", listen_address);
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
 
-    Ok(())
+    Err("Web server shut down".into())
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+async fn main() {
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_env("MYAPP_LOG").unwrap_or_else(|_| {
+            format!(
+                "{}=debug,tower_http=debug,axum::rejection=trace",
+                env!("CARGO_CRATE_NAME")
+            )
+            .into()
+        }))
+        .with(tracing_subscriber::fmt::layer())
         .init();
 
     let cli = Cli::parse();
@@ -234,9 +273,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         database: ArcSwapOption::from(None),
     });
 
-    try_join!(webserver(state.clone()), database_synchronization(state))?;
-
-    Ok(())
+    match try_join!(webserver(state.clone()), database_synchronization(state)) {
+        Ok(_) => {}
+        Err(e) => error!("{}", e),
+    }
 }
 
 async fn root(

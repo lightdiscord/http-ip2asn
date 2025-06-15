@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5", features = ["derive", "env"] }
 flate2 = "1.1"
-tokio = { version = "1.45", features = ["rt", "rt-multi-thread", "macros", "fs", "io-util"] }
+tokio = { version = "1.45", features = ["rt", "rt-multi-thread", "macros", "fs", "io-util", "signal"] }
 axum = "0.8"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 log = "0.4.27"

@@ -15,6 +15,7 @@ RUN cargo +nightly install --target x86_64-unknown-linux-musl --path .
 
 FROM scratch
 
+USER 1000
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/http-ip2asn /http-ip2asn
 
 ENTRYPOINT ["/http-ip2asn"]
